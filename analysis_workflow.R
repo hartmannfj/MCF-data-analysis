@@ -46,6 +46,7 @@ dim(data)
 
 
 # rename channels and select clustering channels
+# maybe here implement substring
 (channel.names <- make.names(as.vector(parameters(fs[[1]])@data$desc), allow_ = F))
 (clustering.channels <- channel.names[c(5, 7:11, 13:17, 19:34, 36)])
 colnames(data) <- c(channel.names, "gate.source")
@@ -77,12 +78,12 @@ dim(data)
 
 
 # subsample data (optional) for t-SNE
-n_sub <- 40000
+n_sub <- 20000
 n <- nrow(data)
 set.seed(123)
 ix <- sample(1:n, n_sub) #if you use subsampled data
 #ix <- 1:nrow(data) #if you dont subsample the data
-data.sub <- data[ix,]
+#data.sub <- data[ix,]
 data_rtsne <- data.matrix(data[ix,clustering.channels])
 
 
@@ -130,7 +131,7 @@ out_rtsne <- Rtsne(data_rtsne, dims = 2, perplexity = 50, theta = 0.5, max_iter 
 gate.df <- as.data.frame(data.sub[,"gate.source"])
 colnames(gate.df) <- "gate.source"
 head(gate.df)
-gate.df$cell.id <- as.factor(row.names(gate.df))
+gate.df$cell.id <-  as.factor(ix) #as.factor(row.names(gate.df))
 #gate.df <- merge(gate.df, md2, by = "gate.source")
 
 
@@ -186,7 +187,7 @@ t1
 
 # plot tSNEs with expression overlayed
 t2 <- ggplot(droplevels(subset(joined.expr, antigen %in% clustering.channels)), aes(x = tSNE1, y = tSNE2, color = expression)) +
-  geom_point(size = 0.05) +
+  geom_point(size = 0.025) +
   coord_fixed(ratio = 1) +
   scale_colour_gradientn(colours = jet.colors(100), limits = c(0,1)) +
   facet_wrap(~ antigen, ncol = 8, scales = "free") +
@@ -197,22 +198,14 @@ t2
 
 # plot tSNEs with k.values overlayed
 t3 <- ggplot(joined.meta, aes(x = tSNE1, y = tSNE2, color = cluster.assigment)) +
-  geom_point(size = 0.05) +
+  geom_point(size = 0.025) +
   coord_fixed(ratio = 1) +
   scale_colour_manual(name = NULL,values = db1) +
-  facet_wrap(~ k.value, ncol = 8, scales = "free") + 
+  facet_wrap(~ k.value, ncol = 6, scales = "free") + 
   ggtitle("tSNE map with different k.values") +
   theme_tsne
 t3
 
-
-
-# save
-#pdf("fixed_40000_tSNE.pdf", paper = "a4r", useDingbats = T, width = 14, height = 8)
-#t1
-#t2
-#t3
-#dev.off()
 
 
 # save
