@@ -1,12 +1,11 @@
 # data analysis workflow for MCF
+# written by Felix J. Hartmann
 
 
 # set working directory (wd) to where the files are located
-setwd("/Users/hartmann/Desktop/irina/")
+# files should only contain events of interest (eg live, single, CD45+)
+setwd("/Users/hartmann/Desktop/data/")
 
-
-# to load a previos workspace
-#load("analysis_image.RData")
 
 
 # load (or install) all neccessary packages
@@ -24,9 +23,11 @@ if (!require(grid)) {biocLite("grid")}
 if (!require(Rmisc)) {biocLite("Rmisc")}
 
 
+
 # load the fcs-files into a flowSet (fs)
 fs <- read.flowSet(path = getwd(), pattern = "*.fcs", alter.names = T)
 fs
+
 
 
 # combine the flowset into a single flowframe with an additional gate.source channel
@@ -38,6 +39,7 @@ for(i in 1:length(dim)) {temp.source <- rep(i, dim[i])
   gate.source <- c(gate.source, temp.source)}
 
 
+
 # combine data into a matrix
 data <- fsApply(fs, exprs)
 data <- cbind(data, gate.source)
@@ -45,16 +47,19 @@ head(data)
 dim(data)
 
 
+
 # rename channels and select clustering channels
 # maybe here implement substring
 (channel.names <- make.names(as.vector(parameters(fs[[1]])@data$desc), allow_ = F))
-(clustering.channels <- channel.names[c(5, 7:11, 13:17, 19:34, 36)])
+(clustering.channels <- channel.names[c(8,11,14,15,19,21,25,26,30,31:34,37)])
 colnames(data) <- c(channel.names, "gate.source")
+
 
 
 # do arcsinh transformation only for the clustering.channels
 asinh_scale <- 5
 data[,clustering.channels] <- asinh(data[,clustering.channels] / asinh_scale)
+
 
 
 # percentile normalize the data (optional)
@@ -64,6 +69,7 @@ percentile.vector
 data[,clustering.channels] <- t(t(data[,clustering.channels]) / as.numeric(percentile.vector))
 head(data)
 dim(data)
+
 
 
 #write.FCS(x = flowFrame(exprs = data), filename = "transformed.fcs")
@@ -97,7 +103,7 @@ labels <- out_fSOM$map$mapping[,1]
 
 
 # define the range of k.values for metaclusters
-min.cluster <- 5
+min.cluster <- 3
 max.cluster  <- 20
 
 
@@ -107,7 +113,7 @@ max(auto_meta)
 
 
 # do a manual metaclustering for all values up to max
-meta_results <- data.frame(as.factor(data.sub[,"gate.source"]))
+meta_results <- data.frame(as.factor(data[ix,"gate.source"]))
 for (i in min.cluster:max.cluster) {
   set.seed(123)
   out_meta <- FlowSOM::metaClustering_consensus(out_fSOM$map$codes, k = i)
@@ -116,6 +122,7 @@ for (i in min.cluster:max.cluster) {
 meta_results <- meta_results[,2:ncol(meta_results)]
 colnames(meta_results) <- paste("k.", min.cluster:max.cluster, sep = "")
 head(meta_results)
+
 
 
 # run bh SNE
@@ -128,7 +135,7 @@ out_rtsne <- Rtsne(data_rtsne, dims = 2, perplexity = 50, theta = 0.5, max_iter 
 # load and prepare metadata
 #md2 <- read.xls("md2.xlsx", sheet = 1, header = T, verbose = F)
 #md2
-gate.df <- as.data.frame(data.sub[,"gate.source"])
+gate.df <- as.data.frame(data[ix,"gate.source"])
 colnames(gate.df) <- "gate.source"
 head(gate.df)
 gate.df$cell.id <-  as.factor(ix) #as.factor(row.names(gate.df))
@@ -143,7 +150,7 @@ head(tsne)
 
 
 # prepare the expression data
-data.ix.df <- data.frame(data.sub)
+data.ix.df <- data.frame(data[ix,])
 data.ix.df$cell.id <- as.factor(ix)
 data.melt <- melt(data.ix.df, variable.name = "antigen", value.name = "expression", id.vars = c("cell.id", "gate.source"))
 joined.expr <- merge(data.melt, tsne, by = "cell.id")
@@ -162,7 +169,7 @@ joined.meta <- merge(joined.meta, gate.df, by = "cell.id")
 
 # define the plotting stuff
 theme_tsne <-  theme(panel.margin = unit(1.3, "lines"), 
-                     strip.text = element_text(size = rel(1.4)), 
+                     strip.text = element_text(size = rel(0.8)), 
                      axis.ticks.length = unit(0.3, "lines"),
                      axis.text = element_blank(),
                      axis.title.x = element_blank(),
@@ -185,15 +192,17 @@ t1 <- ggplot(tsne, aes(x = tSNE1, y = tSNE2)) +
 t1
 
 
+
 # plot tSNEs with expression overlayed
 t2 <- ggplot(droplevels(subset(joined.expr, antigen %in% clustering.channels)), aes(x = tSNE1, y = tSNE2, color = expression)) +
   geom_point(size = 0.025) +
   coord_fixed(ratio = 1) +
   scale_colour_gradientn(colours = jet.colors(100), limits = c(0,1)) +
-  facet_wrap(~ antigen, ncol = 8, scales = "free") +
+  facet_wrap(~ antigen, ncol = 5, scales = "free") +
   ggtitle("tSNE map with expression values") +
   theme_tsne + theme(strip.text = element_text(size = rel(0.8)))
 t2
+
 
 
 # plot tSNEs with k.values overlayed
@@ -209,17 +218,18 @@ t3
 
 
 # save
-save.name <- "irina"
+save.name <- "irina_2nd"
 ggsave(filename = paste(save.name, "tnse_black.png", sep=""), plot = t1, scale = 1) #, width = 6, height = 6, units = c("in")) 
 ggsave(filename = paste(save.name, "tnse_exprs.png", sep=""), plot = t2, scale = 1) #, width = 8, height = 5, units = c("in")) 
 ggsave(filename = paste(save.name, "tnse_kvalues.png", sep=""), plot = t3, scale = 1) #, width = 8, height = 6, units = c("in")) 
-#ggsave(filename = "tnse_k6_genotype.png", plot = t4, scale = 1, width = 6, height = 6, units = c("in")) 
+
 
 
 # make combined expression matrix
 ce <- data.matrix(cbind(data[ix,], meta_results))
 head(ce)
 dim(ce)
+
 
 
 # go through all k.values and make mean matrices
@@ -235,6 +245,7 @@ for(ia in min.cluster:max.cluster) {
     rownames(return_mat) <- paste("cluster", 1:cluster_num, sep="")
     plot.list[[ia-min.cluster+1]] <- return_mat
 }    
+
 
   
 # make a list of ggplot2 heatmap items
