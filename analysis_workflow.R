@@ -285,10 +285,6 @@ head(df_plot)
 
 # melt for ggplot
 df_melt <- melt(df_plot, measure.vars = colnames(df_plot)[2:8])
-heat.mat <- man.cyto[,plot_vars]
-heat.mat <- data.matrix(heat.mat)
-rownames(heat.mat) <- man.cyto$pub.names
-heat.mat <- heat.mat[order(rownames(heat.mat)),]
 
 
 
