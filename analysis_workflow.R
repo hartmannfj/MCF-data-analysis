@@ -119,8 +119,8 @@ for (i in min.cluster:max.cluster) {
   out_meta <- FlowSOM::metaClustering_consensus(out_fSOM$map$codes, k = i)
   meta_results <- cbind(meta_results, as.factor(out_meta[labels]))}
 
-meta_results <- meta_results[,2:ncol(meta_results)]
-colnames(meta_results) <- paste("k.", min.cluster:max.cluster, sep = "")
+#meta_results <- meta_results[,2:ncol(meta_results)]
+colnames(meta_results) <- c("gate.source", paste("k.", min.cluster:max.cluster, sep = ""))
 head(meta_results)
 
 
@@ -262,5 +262,44 @@ temp <- lapply(1:length(plot.list), function(i) {
       breaks = seq(0, 1, by = 0.1111111111))
 })
 dev.off()
+
+
+
+# calculate the frequency of every cluster in each sample
+fm <- ddply(meta_results, .(gate.source), function(x) {
+        df <- data.frame(table(x$k.7))
+        prop <- (df$Freq/sum(df$Freq))*100 
+        }
+      )
+colnames(fm) <- c("gate.source", paste("cluster.", 1:7, sep=""))
+fm
+
+
+
+# show as bargraph plot
+df_plot <- data.frame(fm)
+df_plot$samples <- sampleNames(fs)
+head(df_plot)
+
+
+
+# melt for ggplot
+df_melt <- melt(df_plot, measure.vars = colnames(df_plot)[2:8])
+heat.mat <- man.cyto[,plot_vars]
+heat.mat <- data.matrix(heat.mat)
+rownames(heat.mat) <- man.cyto$pub.names
+heat.mat <- heat.mat[order(rownames(heat.mat)),]
+
+
+
+# make stacked bargraphs
+b1 <- qplot(samples, data = df_melt, geom = "bar", weight = value, fill = variable) +
+        theme(axis.text.x = element_text(angle = 90, color = "black"))
+b1
+
+
+
+# save
+ggsave(filename = paste(save.name, "_composition.png", sep=""), plot = b1, scale = 1)
 
 
